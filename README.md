@@ -32,7 +32,8 @@ Sample HomeBridge Configuration
           "password": "password",
           "maxTemperature": "75",
           "minTemperature": "-25",
-          "serial": "HMT-34932B"
+          "serial": "HMT-34932B",
+          "enableHistory": true
         }
       ],
 

@@ -1,9 +1,11 @@
-var Service, Characteristic;
+var Service, Characteristic, HistoryService;
 var mqtt    = require('mqtt');
+var fakegatoHistory = require('fakegato-history');
 
 module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
+  HistoryService = fakegatoHistory(homebridge);
   homebridge.registerAccessory("homebridge-mqtt-temperature", "mqtt-temperature", TemperatureAccessory);
 }
 
@@ -70,6 +72,17 @@ function TemperatureAccessory(log, config) {
 
   //that.lowBattery = true;
 
+  var services = [this.service];
+
+  var historySvc;
+
+  if (config.enableHistory) {
+    let historyOptions = new HistoryOptions();
+    historySvc = new HistoryService('weather', {displayName: name, log: log}, historyOptions);
+    // return history service too
+    services.push( historySvc );
+  }
+
   this.client.on('message', function (topic, message) {
 
     try {
@@ -107,9 +120,25 @@ function TemperatureAccessory(log, config) {
         that.service
           .getCharacteristic(Characteristic.ChargingState).updateValue(that.chargingState);
       }
+      if (historySvc) {
+        var logEntry = {
+          time: Math.floor(Date.now() / 1000),  // seconds (UTC)
+          temp: parseFloat(message)  // fakegato-history logProperty 'temp' for temperature sensor
+        };
+        historySvc.addEntry(logEntry);
+      }
     }
   });
 
+  // Our accessory instance
+  var thing = {};
+
+  // Return services
+  thing.getServices = function () {
+    return services;
+  };
+
+  return thing;
 }
 
 TemperatureAccessory.prototype.getState = function(callback) {
@@ -151,4 +180,12 @@ TemperatureAccessory.prototype.getServices = function() {
     .setCharacteristic(Characteristic.SerialNumber, this.options["serialnumber"]);
 
   return [informationService, this.service];
+}
+
+// constructor for fakegato-history options
+function HistoryOptions() {
+  // maximum size of stored data points
+  this.size = 4032;
+  // data will be stored in .homebridge or path specified with homebridge -U option
+  this.storage = 'fs';
 }
